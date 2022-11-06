@@ -70,7 +70,8 @@ class PackageManager:
         self.NuGetDependencies = {}
         # only for csproj
         self.ProjectReferences = []
-        self.PackageReferences = {}
+        # reference to other packages
+        self.PackageReferences = []
         self.SupportedFrameworks = []
         # Framework under consideration
         self.Framework = ""
@@ -122,6 +123,7 @@ class PackageManager:
                 self.VersionDownloads = version["downloads"]
 
     def initialize_from_csproj(self, csproj_data):
+
         self.DataType = "csproj"
         self.NuGetDependencies = {}
         self.SupportedFrameworks = []
@@ -129,6 +131,7 @@ class PackageManager:
             print("Project details not available!")
             return None
 
+        # TODO need better way and functions for list and dict:
         if "PropertyGroup" in csproj_data["Project"]:
             # PropertyGroup can be one instance: dict or can be in multiples: list
             if isinstance(csproj_data["Project"]["PropertyGroup"], (dict)):
@@ -192,12 +195,15 @@ class PackageManager:
         if isinstance(csproj_data["Project"]["ItemGroup"], (dict)):
             # if dictionary, get the PackageReference for NuGet
             item_group = csproj_data["Project"]["ItemGroup"]
+
+            # NuGet Packages
             if "PackageReference" in item_group:
                 for pkg_reference in csproj_data["Project"]["ItemGroup"][
                     "PackageReference"
                 ]:
                     dependency_list.append(self.PackageDependency(pkg_reference))
 
+            # CS Proj references
             if "ProjectReference" in item_group:
                 if isinstance(item_group["ProjectReference"], (dict)):
                     project_reference = item_group["ProjectReference"]
@@ -210,9 +216,45 @@ class PackageManager:
                             return_csproj_name_from_path(project_reference["@Include"])
                         )
 
+            # other assemblies
+            if "Reference" in item_group:
+                if isinstance(item_group["Reference"], (dict)):
+                    project_reference = item_group["Reference"]
+                    if "Include" in project_reference:
+                        reference = project_reference["Include"]
+                        if "Version" in project_reference:
+                            reference = reference + "_" + project_reference["Version"]
+                        elif "@Version" in project_reference:
+                            reference = reference + "_" + project_reference["@Version"]
+                        self.PackageReferences.append(reference)
+                    elif "@Include" in project_reference:
+                        reference = project_reference["@Include"]
+                        if "Version" in project_reference:
+                            reference = reference + "_" + project_reference["Version"]
+                        elif "@Version" in project_reference:
+                            reference = reference + "_" + project_reference["@Version"]
+                        self.PackageReferences.append(reference)
+                elif isinstance(item_group["Reference"], (list)):
+                    for project_reference in item_group["Reference"]:
+                        if "Include" in project_reference:
+                            reference = project_reference["Include"]
+                            if "Version" in project_reference:
+                                reference = reference + "_" + project_reference["Version"]
+                            elif "@Version" in project_reference:
+                                reference = reference + "_" + project_reference["@Version"]
+                            self.PackageReferences.append(reference)
+                        elif "@Include" in project_reference:
+                            reference = project_reference["@Include"]
+                            if "Version" in project_reference:
+                                reference = reference + "_" + project_reference["Version"]
+                            elif "@Version" in project_reference:
+                                reference = reference + "_" + project_reference["@Version"]
+                            self.PackageReferences.append(reference)
+
         elif isinstance(csproj_data["Project"]["ItemGroup"], (list)):
             for item_group in csproj_data["Project"]["ItemGroup"]:
                 if item_group is not None:
+                    # NuGet Packages
                     if "PackageReference" in item_group:
                         if isinstance(item_group["PackageReference"], (list)):
                             for pkg_reference in item_group["PackageReference"]:
@@ -220,7 +262,7 @@ class PackageManager:
                         elif isinstance(item_group["PackageReference"], (dict)):
                             pkg_reference = item_group["PackageReference"]
                             dependency_list.append(self.PackageDependency(pkg_reference))
-
+                    # CS Proj references
                     if "ProjectReference" in item_group:
                         if isinstance(item_group["ProjectReference"], (dict)):
                             project_reference = item_group["ProjectReference"]
@@ -234,6 +276,41 @@ class PackageManager:
                                         project_reference["@Include"]
                                     )
                                 )
+                    # other assemblies
+                    if "Reference" in item_group:
+                        if isinstance(item_group["Reference"], (dict)):
+                            project_reference = item_group["Reference"]
+                            if "Include" in project_reference:
+                                reference = project_reference["Include"]
+                                if "Version" in project_reference:
+                                    reference = reference + "_" + project_reference["Version"]
+                                elif "@Version" in project_reference:
+                                    reference = reference + "_" + project_reference["@Version"]
+                                self.PackageReferences.append(reference)
+                            elif "@Include" in project_reference:
+                                reference = project_reference["@Include"]
+                                if "Version" in project_reference:
+                                    reference = reference + "_" + project_reference["Version"]
+                                elif "@Version" in project_reference:
+                                    reference = reference + "_" + project_reference["@Version"]
+                                self.PackageReferences.append(reference)
+                        elif isinstance(item_group["Reference"], (list)):
+                            for project_reference in item_group["Reference"]:
+                                if "Include" in project_reference:
+                                    reference = project_reference["Include"]
+                                    if "Version" in project_reference:
+                                        reference = reference + "_" + project_reference["Version"]
+                                    elif "@Version" in project_reference:
+                                        reference = reference + "_" + project_reference["@Version"]
+                                    self.PackageReferences.append(reference)
+                                elif "@Include" in project_reference:
+                                    reference = project_reference["@Include"]
+                                    if "Version" in project_reference:
+                                        reference = reference + "_" + project_reference["Version"]
+                                    elif "@Version" in project_reference:
+                                        reference = reference + "_" + project_reference["@Version"]
+                                    self.PackageReferences.append(reference)
+
 
         for framework in self.SupportedFrameworks:
             self.NuGetDependencies[framework] = dependency_list

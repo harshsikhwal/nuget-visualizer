@@ -64,22 +64,29 @@ def generate_csproj_basic_graph(csproj_data):
     net.add_node(csproj_data.Name, label=csproj_data.Name, color="#88d184", level=0)
 
     # add the project dependencies
-    package_references = csproj_data.ProjectReferences
+    project_references = csproj_data.ProjectReferences
+    if len(project_references) > 0:
+        for project in project_references:
+            net.add_node(project, label=project, color="#88d184", level=1)
+            # net.add_edge(csproj_data.Name, to=package)
+            net.add_edge(project, to=csproj_data.Name)
+
+    # add the assembly dependencies
+    package_references = csproj_data.PackageReferences
     if len(package_references) > 0:
         for package in package_references:
-            net.add_node(package, label=package, color="#88d184", level=1)
+            net.add_node(package, label=package, color="#b4c6ca", level=2)
             # net.add_edge(csproj_data.Name, to=package)
             net.add_edge(package, to=csproj_data.Name)
 
     # add the nuget dependencies
-
     nuget_dependencies = csproj_data.NuGetDependencies[csproj_data.Framework]
     for dependency in nuget_dependencies:
         net.add_node(
             dependency.PackageName + "_" + dependency.VersionRange.Base,
             label=dependency.PackageName + " : " + dependency.VersionRange.Base,
             color="#2383ce",
-            level=2,
+            level=3,
         )
 
         # net.add_edge(csproj_data.Name, to=dependency.PackageName + "_" + dependency.VersionRange.Base)
@@ -109,10 +116,19 @@ def generate_soln_basic_graph(solution_file_name, csproj_package_mapper):
 
     # add the project dependencies
     for csproj_name in csproj_package_mapper:
-        package_references = csproj_package_mapper[csproj_name].ProjectReferences
+        project_references = csproj_package_mapper[csproj_name].ProjectReferences
+        if len(project_references) > 0:
+            for project in project_references:
+                # net.add_edge(csproj_name, to=package)
+                net.add_edge(project, to=csproj_name)
+
+    # add the assembly dependencies
+    for csproj_name in csproj_package_mapper:
+        package_references = csproj_package_mapper[csproj_name].PackageReferences
         if len(package_references) > 0:
             for package in package_references:
-                # net.add_edge(csproj_name, to=package)
+                net.add_node(package, label=package, color="#b4c6ca", level=2)
+                # net.add_edge(csproj_data.Name, to=package)
                 net.add_edge(package, to=csproj_name)
 
     # add the nuget dependencies
@@ -124,7 +140,7 @@ def generate_soln_basic_graph(solution_file_name, csproj_package_mapper):
                 dependency.PackageName + "_" + dependency.VersionRange.Base,
                 label=dependency.PackageName + " : " + dependency.VersionRange.Base,
                 color="#2383ce",
-                level=2,
+                level=3,
             )
             package_label = ""
             if pkg.DataType == "nuget":
@@ -183,12 +199,20 @@ def generate_csproj_deep_net(net, csproj_package, sub_packages):
     )
 
     # add the project dependencies
-    package_references = csproj_package.ProjectReferences
+    project_references = csproj_package.ProjectReferences
+    if len(project_references) > 0:
+        for project in project_references:
+            net.add_node(project, label=project, color="#88d184", level=1)
+            # net.add_edge(csproj_data.Name, to=package)
+            net.add_edge(project, to=csproj_package.Name)
+            net.add_edge(project, to=csproj_package.Name)
+
+    # add the assembly dependencies
+    package_references = csproj_package.PackageReferences
     if len(package_references) > 0:
         for package in package_references:
-            net.add_node(package, label=package, color="#88d184", level=1)
+            net.add_node(package, label=package, color="#b4c6ca", level=2)
             # net.add_edge(csproj_data.Name, to=package)
-            net.add_edge(package, to=csproj_package.Name)
             net.add_edge(package, to=csproj_package.Name)
 
     # add the nuget dependencies
@@ -224,7 +248,7 @@ def generate_csproj_deep_net(net, csproj_package, sub_packages):
                         lvl + 1,
                     )
 
-    pd(csproj_package, sub_packages, 2)
+    pd(csproj_package, sub_packages, 3)
 
     return net
 
