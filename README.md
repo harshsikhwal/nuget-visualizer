@@ -1,5 +1,9 @@
 # NuGet Visualizer
 
+[![GitHub issues](https://img.shields.io/github/issues/harshsikhwal/nuget-visualizer)](https://github.com/harshsikhwal/nuget-visualizer/issues)
+[![GitHub stars](https://img.shields.io/github/stars/harshsikhwal/nuget-visualizer)](https://github.com/harshsikhwal/nuget-visualizer/stargazers)
+[![GitHub license](https://img.shields.io/github/license/harshsikhwal/nuget-visualizer)](https://github.com/harshsikhwal/nuget-visualizer/blob/main/LICENSE)
+
 An interactive script that helps you to visualize NuGet package dependencies as well as dependencies of your Solution and csproj.
 
 A sample dependency graph for sample solution:
