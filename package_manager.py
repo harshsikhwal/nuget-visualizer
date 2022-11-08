@@ -136,21 +136,34 @@ class PackageManager:
             # PropertyGroup can be one instance: dict or can be in multiples: list
             if isinstance(csproj_data["Project"]["PropertyGroup"], (dict)):
                 # single unit
-                if "TargetFramework" in csproj_data["Project"]["PropertyGroup"]:
-                    target_framework = (
-                        "." + csproj_data["Project"]["PropertyGroup"]["TargetFramework"]
-                    )
-                    self.SupportedFrameworks.extend(target_framework.split(","))
-                elif (
-                    "TargetFrameworkVersion" in csproj_data["Project"]["PropertyGroup"]
-                ):
-                    target_framework = (
-                        ".NETFramework"
-                        + csproj_data["Project"]["PropertyGroup"][
-                            "TargetFrameworkVersion"
-                        ]
-                    )
-                    self.SupportedFrameworks.extend(target_framework)
+                property_group = csproj_data["Project"]["PropertyGroup"]
+                if "TargetFramework" in property_group:
+                    frameworks = property_group["TargetFramework"].split(";")
+                    for i in range(len(frameworks)):
+                        frameworks[i] = "." + frameworks[i]
+                    self.SupportedFrameworks.extend(frameworks)
+                elif "TargetFrameworkVersion" in property_group:
+                    frameworks = property_group["TargetFrameworkVersion"].split(";")
+                    for i in range(len(frameworks)):
+                        f = frameworks[i].strip()
+                        if f[0] == "v":
+                            f = f[1:]
+                            f.replace("net", "")
+                            frameworks[i] = ".NETFramework " + f
+                        else:
+                            frameworks[i] = "." + f
+                    self.SupportedFrameworks.extend(frameworks)
+                elif "TargetFrameworks" in property_group:
+                    frameworks = property_group["TargetFrameworks"].split(";")
+                    for i in range(len(frameworks)):
+                        f = frameworks[i].strip()
+                        if f[0] == "v":
+                            f = f[1:]
+                            f.replace("net", "")
+                            frameworks[i] = ".NETFramework " + f
+                        else:
+                            frameworks[i] = "." + f
+                    self.SupportedFrameworks.extend(frameworks)
 
                 # add the assembly name
                 if "Copyright" in csproj_data["Project"]["PropertyGroup"]:
@@ -166,17 +179,31 @@ class PackageManager:
                 for property_group in csproj_data["Project"]["PropertyGroup"]:
                     if property_group is not None:
                         if "TargetFramework" in property_group:
-                            frameworks = property_group["TargetFramework"].split(",")
+                            frameworks = property_group["TargetFramework"].split(";")
                             for i in range(len(frameworks)):
                                 frameworks[i] = "." + frameworks[i]
                             self.SupportedFrameworks.extend(frameworks)
                         elif "TargetFrameworkVersion" in property_group:
-                            frameworks = property_group["TargetFrameworkVersion"].split(",")
+                            frameworks = property_group["TargetFrameworkVersion"].split(";")
                             for i in range(len(frameworks)):
                                 f = frameworks[i].strip()
                                 if f[0] == "v":
                                     f = f[1:]
-                                frameworks[i] = ".NETFramework " + f
+                                    f.replace("net", "")
+                                    frameworks[i] = ".NETFramework " + f
+                                else:
+                                    frameworks[i] = "." + f
+                            self.SupportedFrameworks.extend(frameworks)
+                        elif "TargetFrameworks" in property_group:
+                            frameworks = property_group["TargetFrameworks"].split(";")
+                            for i in range(len(frameworks)):
+                                f = frameworks[i].strip()
+                                if f[0] == "v":
+                                    f = f[1:]
+                                    f.replace("net", "")
+                                    frameworks[i] = ".NETFramework " + f
+                                else:
+                                    frameworks[i] = "." + f
                             self.SupportedFrameworks.extend(frameworks)
 
         if "ItemGroup" not in csproj_data["Project"]:
