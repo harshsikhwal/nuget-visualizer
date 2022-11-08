@@ -255,6 +255,8 @@ def generate_csproj_deep_net(net, csproj_package, sub_packages):
 
 def search_and_auto_generate_data(query, version):
     package_data = nuget_api_manager.search_and_auto_generate_data(query)
+    if package_data is None or len(package_data) == 0:
+        return None
     pkg_manager = package_manager.PackageManager("NuGet")
     pkg_manager.initialize_from_nuget_data(package_data)
     generate_catalog_data(pkg_manager, version)
@@ -345,9 +347,10 @@ def generate_for_solution():
             # or should take whole as argument
             # need to refactor
             sub_packages = {}
+            framemworks_type_map = {"nuget": [], "csproj": []}
             for csproj_name in csproj_path_mapper:
                 generate_nuget_dependency_for_csproj(
-                    csproj_package_mapper[csproj_name], sub_packages
+                    csproj_package_mapper[csproj_name], sub_packages, framemworks_type_map
                 )
 
             generate_soln_deep_graph(
@@ -395,24 +398,34 @@ def generate_catalog_data(pkg_mgr, version):
     pkg_mgr.set_catalog_data_json(catalog_data)
 
 
-def generate_nuget_dependency_for_csproj(csproj_data, sub_packages):
+def generate_nuget_dependency_for_csproj(csproj_data, sub_packages, frameworks_type_map):
 
-    if len(csproj_data.SupportedFrameworks) > 1:
-        # if more than one framework exists
-        print(
-            "Choose framework to generate dependency. Please enter the serial number:"
-        )
+    # get frameworks for csproj
+    frameworks = frameworks_type_map["csproj"]
+
+    found = False
+    for framework in frameworks:
+        if framework in csproj_data.SupportedFrameworks:
+            csproj_data.Framework = framework
+            found = True
+
+    if not found:
+        print(f"[INTERRUPT] Choose framework to generate dependency for {csproj_data.Name}. Please enter the serial number: ")
         csproj_data.print_available_frameworks_with_index()
         while True:
             choice = input("Enter your choice: ")
             if not choice.isnumeric():
-                print("Please enter the serial number!")
+                print("[WARN] Please enter the serial number!")
             elif 1 <= int(choice) <= len(csproj_data.SupportedFrameworks):
                 csproj_data.Framework = csproj_data.SupportedFrameworks[int(choice) - 1]
-                print(csproj_data.Framework + " framework selected")
+                if csproj_data.Framework in frameworks_type_map["csproj"]:
+                    frameworks_type_map["csproj"].remove(csproj_data.Framework)
+                # add to type map
+                frameworks_type_map["csproj"].insert(0, csproj_data.Framework)
+                print("[INFO] Framework " + csproj_data.Framework + " selected for " + csproj_data.Name)
                 break
             else:
-                print("Invalid Choice!")
+                print("[ERROR] Invalid Choice!")
 
     visited_packages = {}
     package_stack = []
@@ -435,41 +448,89 @@ def generate_nuget_dependency_for_csproj(csproj_data, sub_packages):
                 sub_package_data = nuget_api_manager.search_and_auto_generate_data(
                     package.PackageName, package.VersionRange.Base
                 )
-                # refactor it
-                sub_pkg_mgr = package_manager.PackageManager("NuGet")
-                sub_pkg_mgr.initialize_from_nuget_data(sub_package_data)
-                # generate the catalog data
-                generate_catalog_data(sub_pkg_mgr, package.VersionRange.Base)
-                # add the name and version to the dictionary
-                # key:
-                # name_version
-                sub_packages[sub_pkg_mgr.Name + "_" + sub_pkg_mgr.Version] = sub_pkg_mgr
-                # get the dependencies and add to a list
-                # TODO need a mechanism to decode target framework
-                # TODO csproj has FW in another ways and we need to translate it to supported versions. Need decoding logic
+                if sub_package_data is None or len(sub_package_data) == 0:
+                    print(f"[WARN] No results found for {package.PackageName}")
+                else:
+                    # refactor it
+                    sub_pkg_mgr = package_manager.PackageManager("NuGet")
+                    sub_pkg_mgr.initialize_from_nuget_data(sub_package_data)
+                    # generate the catalog data
+                    generate_catalog_data(sub_pkg_mgr, package.VersionRange.Base)
+                    # add the name and version to the dictionary
+                    # key:
+                    # name_version
+                    sub_packages[sub_pkg_mgr.Name + "_" + sub_pkg_mgr.Version] = sub_pkg_mgr
+                    # get the dependencies and add to a list
 
-                for dg in sub_pkg_mgr.NuGetDependencies:
-                    if str.lower(csproj_data.Framework) == str.lower(dg):
-                        sub_pkg_mgr.Framework = dg
-                        for dependency in sub_pkg_mgr.NuGetDependencies[dg]:
-                            if dependency.PackageName not in visited_packages:
-                                temp_package_list.append(dependency)
+                    # use the recently used fw
+                    found = False
+                    frameworks = frameworks_type_map["nuget"]
+                    for framework in frameworks:
+                        if framework in sub_pkg_mgr.NuGetDependencies:
+                            sub_pkg_mgr.Framework = framework
+                            # add the related dependencies
+                            for dependency in sub_pkg_mgr.NuGetDependencies[sub_pkg_mgr.Framework]:
+                                if dependency.PackageName not in sub_packages:
+                                    temp_package_list.append(dependency)
+                            found = True
+                            break
+                    if not found:
+                        if len(sub_pkg_mgr.SupportedFrameworks) == 1:
+                            sub_pkg_mgr.Framework = sub_pkg_mgr.SupportedFrameworks[0]
+                            # remove the entry from list
+                            if sub_pkg_mgr.Framework in frameworks_type_map["nuget"]:
+                                frameworks_type_map["nuget"].remove(sub_pkg_mgr.Framework)
+                            # add to type map
+                            frameworks_type_map["nuget"].insert(0, sub_pkg_mgr.Framework)
+                            print(sub_pkg_mgr.Framework + " framework selected")
+                            for dependency in sub_pkg_mgr.NuGetDependencies[sub_pkg_mgr.Framework]:
+                                if dependency.PackageName not in sub_packages:
+                                    temp_package_list.append(dependency)
 
-        package_stack.extend(temp_package_list)
+                        elif len(sub_pkg_mgr.SupportedFrameworks) > 1:
+                            # get the list and add:
+                            print(f"[INTERRUPT] Choose framework to generate dependency for {sub_pkg_mgr.Name}. Please enter the serial number:")
+                            print(f"Frameworks selected for {csproj_data.Name}: ", frameworks_type_map["csproj"])
+                            sub_pkg_mgr.print_available_frameworks_with_index()
+                            while True:
+                                choice = input("Enter your choice: ")
+                                if not choice.isnumeric():
+                                    print("Please enter the serial number!")
+                                elif 1 <= int(choice) <= len(sub_pkg_mgr.SupportedFrameworks):
+                                    sub_pkg_mgr.Framework = sub_pkg_mgr.SupportedFrameworks[int(choice) - 1]
+                                    # remove the entry from list
+                                    if sub_pkg_mgr.Framework in frameworks_type_map["nuget"]:
+                                        frameworks_type_map["nuget"].remove(sub_pkg_mgr.Framework)
+                                    # add to type map
+                                    frameworks_type_map["nuget"].insert(0, sub_pkg_mgr.Framework)
+                                    print(sub_pkg_mgr.Framework + " framework selected")
+                                    for dependency in sub_pkg_mgr.NuGetDependencies[sub_pkg_mgr.Framework]:
+                                        if dependency.PackageName not in sub_packages:
+                                            temp_package_list.append(dependency)
+                                    break
+                                else:
+                                    print("[ERROR] Invalid Choice!")
+                        else:
+                            print(f"Framework not present for {sub_pkg_mgr.Name}")
+
+        if len(temp_package_list) > 0:
+            package_stack.extend(temp_package_list)
 
 
 def generate_for_csproj():
     csproj_path = ""
     while True:
-        choice = input("Enter the csproj path: ")
+        choice = input("Enter the csproj path or press E to return: ")
+        if str.lower(choice) == 'e':
+            return
         if not os.path.exists(choice):
-            print(choice + " not found")
+            print("ERROR" + choice + " not found. Please try again!")
         else:
             csproj_path = choice
             break
     csproj_data = read_and_deserialize_csproj(csproj_path)
 
-    print("What would you like to do: ")
+    print("[INTERRUPT] What would you like to do: ")
     while True:
         choice = input(
             "1. Display Package Details\n2. Generate Dependency Tree\n3. Return to Main Menu: "
@@ -494,7 +555,8 @@ def generate_for_csproj():
                 elif sub_choice == "2":
 
                     sub_packages = {}
-                    generate_nuget_dependency_for_csproj(csproj_data, sub_packages)
+                    frameworks_type_map = {"nuget": [], "csproj": []}
+                    generate_nuget_dependency_for_csproj(csproj_data, sub_packages, frameworks_type_map)
                     # framework_from_nuget = ""
                     # print_csproj_dependency(csproj_data, sub_packages, framework_from_nuget)
                     generate_csproj_deep_graph(csproj_data, sub_packages)
@@ -505,12 +567,12 @@ def generate_for_csproj():
         elif choice == "3":
             return
         else:
-            print("Invalid Choice. Please enter the correct choice:")
+            print("[ERROR] Choice. Please enter the correct choice:")
             continue
 
 
 def options():
-    print("Generate for:")
+    print("[INTERRUPT] Generate for:")
     while True:
         choice = input("1. Solution\n2. csproj\n3. Return to previous menu: ")
         if choice == "1":
@@ -521,4 +583,4 @@ def options():
         elif choice == "3":
             return
         else:
-            print("Invalid Choice. Try again!")
+            print("[ERROR] Invalid Choice. Try again!")

@@ -97,26 +97,26 @@ def print_dependency(master_package, sub_packages, target_framework):
             print(tabs + dependency.PackageName + " : " + dependency.VersionRange.Base)
             pd(sub_packages[dependency.PackageName], sub_pkg, fw, print_indent + 1)
 
-    print("Printing Dependency Tree ")
+    print("[INFO] Printing Dependency Tree ")
     print(master_package.Name + " : " + master_package.Version)
     pd(master_package, sub_packages, target_framework, 1)
 
 
 def generate_dependency_data(master_package):
-    print("Choose framework to generate dependency. Please enter the serial number:")
+    print(f"[INTERRUPT] Choose framework to generate dependency for {master_package.Name}. Please enter the serial number:")
     master_package.print_available_frameworks_with_index()
     target_framework = ""
     while True:
         choice = input("Enter your choice: ")
         if not choice.isnumeric():
-            print("Please enter the serial number!")
+            print("[ERROR] Please enter the serial number!")
             pass
         elif 1 <= int(choice) <= len(master_package.SupportedFrameworks):
             target_framework = master_package.SupportedFrameworks[int(choice) - 1]
-            print(target_framework + " framework selected")
+            print("[INFO] Framework " + target_framework + " selected for " + master_package.Name )
             break
         else:
-            print("Invalid Choice!")
+            print("[ERROR] Invalid Choice!")
 
     sub_packages = {}
     visited_packages = {}
@@ -175,9 +175,9 @@ def generate_catalog_data(pkg_mgr, version):
 
 
 def search():
-    package_name = input("Enter the package name: ")
+    package_name = input("[INTERRUPT] Enter the package name: ")
     if package_name == "" or package_name is None:
-        print("Invalid package name!")
+        print("[ERROR] Invalid package name!")
         return
     master_package_data = nuget_api_manager.search_by_title(package_name)
 

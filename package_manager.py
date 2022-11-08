@@ -363,15 +363,19 @@ class PackageManager:
 
         if "dependencyGroups" in catalog_data:
             for framework_dependencies in catalog_data["dependencyGroups"]:
-                framework = framework_dependencies["targetFramework"]
-                self.SupportedFrameworks.append(framework)
-                if "dependencies" in framework_dependencies:
-                    dependency_list = []
-                    for dependencies in framework_dependencies["dependencies"]:
-                        dependency_list.append(self.PackageDependency(dependencies))
-                    self.NuGetDependencies[framework] = dependency_list
+                # TODO check for targetFramework
+                if "targetFramework" in framework_dependencies:
+                    framework = framework_dependencies["targetFramework"]
+                    self.SupportedFrameworks.append(framework)
+                    if "dependencies" in framework_dependencies:
+                        dependency_list = []
+                        for dependencies in framework_dependencies["dependencies"]:
+                            dependency_list.append(self.PackageDependency(dependencies))
+                        self.NuGetDependencies[framework] = dependency_list
+                    else:
+                        self.NuGetDependencies[framework] = []
                 else:
-                    self.NuGetDependencies[framework] = []
+                    print("[WARN] Framework not present.")
         else:
             self.NuGetDependencies["N/A"] = []
 
